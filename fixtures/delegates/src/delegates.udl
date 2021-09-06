@@ -2,7 +2,7 @@ namespace delegates {};
 
 [Delegate]
 interface MyDelegate {
-  any  with_return();
+  Any? with_return();
   void string_saver();
   i32  with_counter();
 };

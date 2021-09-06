@@ -22,6 +22,7 @@ mod delegate;
 mod enum_;
 mod error;
 mod function;
+mod generic;
 mod miscellany;
 mod object;
 mod primitives;
@@ -203,6 +204,7 @@ impl KotlinCodeOracle {
             Type::Enum(id) => Box::new(enum_::EnumCodeType::new(id)),
             Type::DelegateObject(s) => Box::new(delegate::DelegateObjectCodeType::new(s)),
             Type::Object(id) => Box::new(object::ObjectCodeType::new(id)),
+            Type::Generic => Box::new(generic::GenericCodeType::new()),
             Type::Record(id) => Box::new(record::RecordCodeType::new(id)),
             Type::Error(id) => Box::new(error::ErrorCodeType::new(id)),
             Type::CallbackInterface(id) => {
@@ -304,6 +306,11 @@ pub mod filters {
         Ok(oracle.find(type_).type_label(&oracle))
     }
 
+    pub fn type_t_kt(type_: &Type, t: &dyn fmt::Display) -> Result<String, askama::Error> {
+        let oracle = oracle();
+        Ok(oracle.find(type_).type_t_label(&oracle, &t.to_string()))
+    }
+
     pub fn canonical_name(type_: &Type) -> Result<String, askama::Error> {
         let oracle = oracle();
         Ok(oracle.find(type_).canonical_name(&oracle))
@@ -370,5 +377,53 @@ pub mod filters {
     /// and is distinguished from an "Exception".
     pub fn exception_name_kt(nm: &dyn fmt::Display) -> Result<String, askama::Error> {
         Ok(oracle().error_name(nm))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_type_t_label() -> Result<()> {
+        let oracle = KotlinCodeOracle;
+        assert_eq!(
+            "Int".to_string(),
+            oracle
+                .find(&Type::Int32)
+                .type_t_label(&oracle, "GenericType")
+        );
+        assert_eq!(
+            "GenericType".to_string(),
+            oracle
+                .find(&Type::Generic)
+                .type_t_label(&oracle, "GenericType")
+        );
+        assert_eq!(
+            "GenericType?".to_string(),
+            oracle
+                .find(&Type::Optional(Box::new(Type::Generic)))
+                .type_t_label(&oracle, "GenericType")
+        );
+        assert_eq!(
+            "List<GenericType>".to_string(),
+            oracle
+                .find(&Type::Sequence(Box::new(Type::Generic)))
+                .type_t_label(&oracle, "GenericType")
+        );
+        assert_eq!(
+            "Map<String, GenericType>".to_string(),
+            oracle
+                .find(&Type::Map(Box::new(Type::Generic)))
+                .type_t_label(&oracle, "GenericType")
+        );
+
+        assert_eq!(
+            "T?".to_string(),
+            oracle
+                .find(&Type::Optional(Box::new(Type::Generic)))
+                .type_t_label(&oracle, "T")
+        );
+        Ok(())
     }
 }

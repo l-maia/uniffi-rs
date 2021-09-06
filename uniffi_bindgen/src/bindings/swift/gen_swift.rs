@@ -310,6 +310,7 @@ impl SwiftCodeOracle {
             Type::External { .. } => panic!("no support for external types yet"),
             Type::Wrapped { .. } => panic!("no support for wrapped types yet"),
             Type::DelegateObject(_) => unreachable!("Delegate objects should never cross the FFI"),
+            Type::Generic => unreachable!("Generic types should never cross the FFI"),
         }
     }
 }

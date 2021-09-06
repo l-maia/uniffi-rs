@@ -51,6 +51,7 @@ mod filters {
             Type::External { .. } => panic!("External types coming to a uniffi near you soon!"),
             Type::Wrapped { .. } => panic!("Wrapped types coming to a uniffi near you soon!"),
             Type::DelegateObject(_) => unreachable!("Delegate objects should never cross the FFI"),
+            Type::Generic => unreachable!("Generic types should never cross the FFI"),
         })
     }
 
@@ -121,6 +122,7 @@ mod filters {
             Type::String => "String".into(),
             Type::Boolean => "bool".into(),
             Type::DelegateObject(_) => unreachable!("Delegate objects should never cross the FFI"),
+            Type::Generic => unreachable!("Generic types should never cross the FFI"),
         })
     }
 

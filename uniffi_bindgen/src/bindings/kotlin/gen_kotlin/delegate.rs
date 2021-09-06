@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::bindings::backend::{CodeDeclaration, CodeOracle, CodeType};
-use crate::interface::types::ReturnType;
 use crate::interface::{ComponentInterface, DelegateObject};
 use askama::Template;
 

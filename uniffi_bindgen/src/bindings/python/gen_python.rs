@@ -163,6 +163,7 @@ mod filters {
             Type::Wrapped { prim, .. } => coerce_py(nm, prim.as_ref())?,
             Type::External { .. } => panic!("should not be necessary to coerce External types"),
             Type::DelegateObject(_) => unreachable!("Delegate objects should never cross the FFI"),
+            Type::Generic => unreachable!("Generic types should never cross the FFI"),
         })
     }
 
@@ -197,6 +198,7 @@ mod filters {
             Type::Wrapped { prim, .. } => lower_py(nm, prim.as_ref())?,
             Type::External { .. } => panic!("should not be necessary to lower External types"),
             Type::DelegateObject(_) => unreachable!("Delegate objects should never cross the FFI"),
+            Type::Generic => unreachable!("Generic types should never cross the FFI"),
         })
     }
 
@@ -230,6 +232,7 @@ mod filters {
             Type::Wrapped { prim, .. } => lift_py(nm, prim.as_ref())?,
             Type::External { .. } => panic!("should not be necessary to lift External types"),
             Type::DelegateObject(_) => unreachable!("Delegate objects should never cross the FFI"),
+            Type::Generic => unreachable!("Generic types should never cross the FFI"),
         })
     }
 }

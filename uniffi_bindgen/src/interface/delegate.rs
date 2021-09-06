@@ -46,6 +46,7 @@
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 
+use crate::interface::Type;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -53,7 +54,6 @@ use std::hash::{Hash, Hasher};
 use anyhow::{bail, Result};
 
 use super::attributes::MethodAttributes;
-use super::types::{ReturnType, Type};
 use super::{APIConverter, ComponentInterface};
 
 /// An "object" is an opaque type that can be instantiated and passed around by reference,
@@ -141,7 +141,7 @@ impl APIConverter<DelegateObject> for weedle::InterfaceDefinition<'_> {
 pub struct DelegateMethod {
     pub(super) name: String,
     pub(super) object_name: String,
-    pub(super) return_type: ReturnType,
+    pub(super) return_type: Option<Type>,
     pub(super) attributes: MethodAttributes,
 }
 
@@ -150,8 +150,8 @@ impl DelegateMethod {
         &self.name
     }
 
-    pub fn return_type(&self) -> &ReturnType {
-        &self.return_type
+    pub fn return_type(&self) -> Option<&Type> {
+        self.return_type.as_ref()
     }
 
     pub fn throws(&self) -> Option<&str> {
@@ -206,6 +206,8 @@ impl APIConverter<DelegateMethod> for weedle::interface::OperationInterfaceMembe
 
 #[cfg(test)]
 mod test {
+    use crate::interface::Type;
+
     use super::*;
 
     use super::super::object::{Method, Object};
@@ -284,11 +286,11 @@ mod test {
                 [Throws=Error]
                 void it_throws();
 
-                void it_swallows();
+                Any? it_swallows();
 
                 i32 it_counts();
 
-                any it_passes_through();
+                Any it_passes_through();
             };
 
             [Delegate=TheDelegate]
@@ -298,6 +300,9 @@ mod test {
 
                 [CallWith=it_throws]
                 void silent();
+
+                [CallWith=it_swallows]
+                i32 silent_with_return();
 
                 [CallWith=it_counts]
                 void counted();
@@ -331,6 +336,14 @@ mod test {
             m.delegated_throws_type(&dobj),
             Some(Type::Error("Error".into()))
         );
+
+        let m = find_method("silent_with_return", obj);
+        // silent delegates through it_throws, which returns void and throws nothing
+        assert_eq!(
+            m.delegated_return_type(&dobj),
+            Some(Type::Optional(Box::new(Type::Int32)))
+        );
+        assert_eq!(m.delegated_throws_type(&dobj), None);
 
         let m = find_method("counted", obj);
         // counted delegates through it_counts, which returns i32 and throws nothing
