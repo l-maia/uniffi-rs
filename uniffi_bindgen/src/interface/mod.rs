@@ -602,7 +602,7 @@ impl<'ci> ComponentInterface {
                     }
 
                     if !used {
-                        bail!("Object '{}' has a decorator but no methods have [CallWith=] annotations to use it", obj.name())
+                        bail!("Object '{}' has a decorator but no methods have [CallsWith=] annotations to use it", obj.name())
                     }
 
                     with_decorators.insert(obj.type_());
@@ -1131,7 +1131,7 @@ mod test {
             namespace test{};
             [Decorator=TheDecorator]
             interface TheObject {
-                [CallWith=pass_through]
+                [CallsWith=pass_through]
                 void method();
             };
         "#;
@@ -1146,7 +1146,7 @@ mod test {
             namespace test{};
             [Decorator=TheDecorator]
             interface TheObject {
-                [CallWith=pass_through]
+                [CallsWith=pass_through]
                 void method();
             };
             interface TheDecorator {
@@ -1164,7 +1164,7 @@ mod test {
             namespace test{};
             [Decorator=TheDictionary]
             interface TheObject {
-                [CallWith=pass_through]
+                [CallsWith=pass_through]
                 void method();
             };
             dictionary TheDictionary {
@@ -1182,7 +1182,7 @@ mod test {
         let udl: &str = r#"
             namespace test{};
             interface TheObject {
-                [CallWith=pass_through]
+                [CallsWith=pass_through]
                 void method();
             };
             [Decorator]
@@ -1201,7 +1201,7 @@ mod test {
             namespace test{};
             [Decorator=TheDecorator]
             interface TheObject {
-                [CallWith=pass_thru]
+                [CallsWith=pass_thru]
                 void method();
             };
             [Decorator]
@@ -1215,7 +1215,7 @@ mod test {
             "Object method \'TheObject.method\' calls with a decorator method \'TheDecorator.pass_thru\' which does not exist"
         );
 
-        // Perhaps the user has forgotten to use CallWith annotations.
+        // Perhaps the user has forgotten to use `CallsWith` annotations.
         let udl: &str = r#"
             namespace test{};
             [Decorator=TheDecorator]
@@ -1230,7 +1230,7 @@ mod test {
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object \'TheObject\' has a decorator but no methods have [CallWith=] annotations to use it"
+            "Object \'TheObject\' has a decorator but no methods have [CallsWith=] annotations to use it"
         );
     }
 
@@ -1305,7 +1305,7 @@ mod test {
 
             [Decorator=TheDecorator]
             interface TheObject {
-                [CallWith=pass_through]
+                [CallsWith=pass_through]
                 void do_something();
             };
 
@@ -1330,7 +1330,7 @@ mod test {
 
         [Decorator=TheDecorator]
         interface TheObject {
-            [CallWith=pass_through]
+            [CallsWith=pass_through]
             void do_something();
         };
 

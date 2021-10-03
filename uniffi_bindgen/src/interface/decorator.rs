@@ -20,7 +20,7 @@
 //! };
 //! [Decorator=ExampleDecorator]
 //! interface Example {
-//!   [CallWith=async_dispatch]
+//!   [CallsWith=async_dispatch]
 //!   void long_running_method();
 //! };
 //!
@@ -295,19 +295,19 @@ mod test {
 
             [Decorator=TheDecorator]
             interface Testing {
-                [Throws=Error, CallWith=it_swallows]
+                [Throws=Error, CallsWith=it_swallows]
                 void thrower();
 
-                [CallWith=it_throws]
+                [CallsWith=it_throws]
                 void silent();
 
-                [CallWith=it_swallows]
+                [CallsWith=it_swallows]
                 i32 silent_with_return();
 
-                [CallWith=it_counts]
+                [CallsWith=it_counts]
                 void counted();
 
-                [CallWith=it_passes_through]
+                [CallsWith=it_passes_through]
                 sequence<i32?> exotic();
             };
 

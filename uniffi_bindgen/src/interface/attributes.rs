@@ -80,7 +80,7 @@ impl TryFrom<&weedle::attribute::ExtendedAttribute<'_>> for Attribute {
                     "Decorator" => Ok(Attribute::WithDecoratorObject(name_from_id_or_string(
                         &identity.rhs,
                     ))),
-                    "CallWith" => Ok(Attribute::WithDecoratorMethod(name_from_id_or_string(
+                    "CallsWith" => Ok(Attribute::WithDecoratorMethod(name_from_id_or_string(
                         &identity.rhs,
                     ))),
                     _ => anyhow::bail!(
@@ -578,7 +578,7 @@ mod test {
         let attr = Attribute::try_from(&node)?;
         assert!(matches!(attr, Attribute::WithDecoratorObject(nm) if nm == "MyDecoratorProtocol"));
 
-        let (_, node) = weedle::attribute::ExtendedAttribute::parse("CallWith=asyncCall").unwrap();
+        let (_, node) = weedle::attribute::ExtendedAttribute::parse("CallsWith=asyncCall").unwrap();
         let attr = Attribute::try_from(&node)?;
         assert!(matches!(attr, Attribute::WithDecoratorMethod(nm) if nm == "asyncCall"));
 
@@ -638,7 +638,7 @@ mod test {
         );
 
         let (_, node) =
-            weedle::attribute::ExtendedAttributeList::parse("[CallWith=asyncDispatch]").unwrap();
+            weedle::attribute::ExtendedAttributeList::parse("[CallsWith=asyncDispatch]").unwrap();
         let err = FunctionAttributes::try_from(&node).unwrap_err();
         assert_eq!(
             err.to_string(),
@@ -673,7 +673,7 @@ mod test {
         assert!(attrs.get_decorator_method().is_none());
 
         let (_, node) =
-            weedle::attribute::ExtendedAttributeList::parse("[CallWith=asyncDispatch]").unwrap();
+            weedle::attribute::ExtendedAttributeList::parse("[CallsWith=asyncDispatch]").unwrap();
         let attrs = MethodAttributes::try_from(&node).unwrap();
         assert!(matches!(attrs.get_decorator_method(), Some("asyncDispatch")));
     }
