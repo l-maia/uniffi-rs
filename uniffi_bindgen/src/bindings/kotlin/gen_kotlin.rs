@@ -18,7 +18,7 @@ use crate::bindings::backend::{CodeOracle, CodeType, TypeIdentifier};
 
 mod callback_interface;
 mod compounds;
-mod delegate;
+mod decorator;
 mod enum_;
 mod error;
 mod function;
@@ -105,8 +105,8 @@ impl<'a> KotlinWrapper<'a> {
         .chain(ci.iter_function_definitions().into_iter().map(|inner| {
             Box::new(function::KotlinFunction::new(inner, ci)) as Box<dyn CodeDeclaration>
         }))
-        .chain(ci.iter_delegate_definitions().into_iter().map(|inner| {
-            Box::new(delegate::KotlinDelegateObject::new(inner, ci)) as Box<dyn CodeDeclaration>
+        .chain(ci.iter_decorator_definitions().into_iter().map(|inner| {
+            Box::new(decorator::KotlinDecoratorObject::new(inner, ci)) as Box<dyn CodeDeclaration>
         }))
         .chain(ci.iter_object_definitions().into_iter().map(|inner| {
             Box::new(object::KotlinObject::new(inner, ci)) as Box<dyn CodeDeclaration>
@@ -202,7 +202,7 @@ impl KotlinCodeOracle {
             Type::Duration => Box::new(miscellany::DurationCodeType),
 
             Type::Enum(id) => Box::new(enum_::EnumCodeType::new(id)),
-            Type::DelegateObject(s) => Box::new(delegate::DelegateObjectCodeType::new(s)),
+            Type::DecoratorObject(s) => Box::new(decorator::DecoratorObjectCodeType::new(s)),
             Type::Object(id) => Box::new(object::ObjectCodeType::new(id)),
             Type::Generic => Box::new(generic::GenericCodeType::new()),
             Type::Record(id) => Box::new(record::RecordCodeType::new(id)),

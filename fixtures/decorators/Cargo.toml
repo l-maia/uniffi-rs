@@ -1,5 +1,5 @@
 [package]
-name = "delegates"
+name = "decorators"
 version = "0.14.0"
 authors = ["Firefox Sync Team <sync-team@mozilla.com>"]
 edition = "2018"
@@ -7,7 +7,7 @@ publish = false
 
 [lib]
 crate-type = ["staticlib", "cdylib"]
-name = "uniffi_delegates"
+name = "uniffi_decorators"
 
 [dependencies]
 uniffi_macros = {path = "../../uniffi_macros"}

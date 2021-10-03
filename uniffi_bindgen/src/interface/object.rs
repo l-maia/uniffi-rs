@@ -55,7 +55,7 @@ use super::attributes::{ConstructorAttributes, InterfaceAttributes, MethodAttrib
 use super::ffi::{FFIArgument, FFIFunction, FFIType};
 use super::function::Argument;
 use super::types::{rewrite_generic, IterTypes, Type, TypeIterator};
-use super::{APIConverter, ComponentInterface, DelegateMethod, DelegateObject};
+use super::{APIConverter, ComponentInterface, DecoratorMethod, DecoratorObject};
 
 /// An "object" is an opaque type that can be instantiated and passed around by reference,
 /// have methods called on it, and so on - basically your classic Object Oriented Programming
@@ -75,7 +75,7 @@ use super::{APIConverter, ComponentInterface, DelegateMethod, DelegateObject};
 pub struct Object {
     pub(super) name: String,
     pub(super) constructors: Vec<Constructor>,
-    pub(super) delegate_type: Option<Type>,
+    pub(super) decorator_type: Option<Type>,
     pub(super) methods: Vec<Method>,
     pub(super) ffi_func_free: FFIFunction,
     pub(super) uses_deprecated_threadsafe_attribute: bool,
@@ -86,7 +86,7 @@ impl Object {
         Object {
             name,
             constructors: Default::default(),
-            delegate_type: Default::default(),
+            decorator_type: Default::default(),
             methods: Default::default(),
             ffi_func_free: Default::default(),
             uses_deprecated_threadsafe_attribute: false,
@@ -101,8 +101,8 @@ impl Object {
         Type::Object(self.name.clone())
     }
 
-    pub fn delegate_type(&self) -> Option<Type> {
-        self.delegate_type.clone()
+    pub fn decorator_type(&self) -> Option<Type> {
+        self.decorator_type.clone()
     }
 
     pub fn constructors(&self) -> Vec<&Constructor> {
@@ -223,13 +223,13 @@ impl APIConverter<Object> for weedle::InterfaceDefinition<'_> {
             object.constructors.push(Default::default());
         }
 
-        // Finally, add the delegate object.
-        if let Some(nm) = attributes.get_delegate_object() {
-            object.delegate_type = ci
+        // Finally, add the decorator object.
+        if let Some(nm) = attributes.get_decorator_object() {
+            object.decorator_type = ci
                 .get_type(nm)
                 // No type has been declared of this name, but
                 // we let check_validity() detect and report the error.
-                .or_else(|| Some(Type::DelegateObject(nm.into())));
+                .or_else(|| Some(Type::DecoratorObject(nm.into())));
         }
         Ok(object)
     }
@@ -379,21 +379,21 @@ impl Method {
         self.return_type.as_ref()
     }
 
-    fn delegate_method<'a>(
+    fn decorator_method<'a>(
         &self,
-        delegate_object: &Option<&'a DelegateObject>,
-    ) -> Option<&'a DelegateMethod> {
-        if delegate_object.is_none() || !self.uses_delegate_method() {
+        decorator_object: &Option<&'a DecoratorObject>,
+    ) -> Option<&'a DecoratorMethod> {
+        if decorator_object.is_none() || !self.uses_decorator_method() {
             None
         } else {
-            let delegate_object = delegate_object.unwrap();
-            let dm = self.delegate_method_name().unwrap();
-            delegate_object.find_method(&dm)
+            let decorator_object = decorator_object.unwrap();
+            let dm = self.decorator_method_name().unwrap();
+            decorator_object.find_method(&dm)
         }
     }
 
-    pub fn delegated_return_type(&self, delegate_object: &Option<&DelegateObject>) -> Option<Type> {
-        if let Some(dm) = self.delegate_method(delegate_object) {
+    pub fn decorated_return_type(&self, decorator_object: &Option<&DecoratorObject>) -> Option<Type> {
+        if let Some(dm) = self.decorator_method(decorator_object) {
             match (dm.return_type(), self.return_type()) {
                 (Some(dmt), _) if !dmt.is_generic() => Some(dmt.clone()),
                 (Some(dmt), Some(t)) => Some(rewrite_generic(dmt, t)),
@@ -418,8 +418,8 @@ impl Method {
             .map(|name| Type::Error(name.to_owned()))
     }
 
-    pub fn delegated_throws_type(&self, delegate_object: &Option<&DelegateObject>) -> Option<Type> {
-        if let Some(dm) = self.delegate_method(&delegate_object) {
+    pub fn decorated_throws_type(&self, decorator_object: &Option<&DecoratorObject>) -> Option<Type> {
+        if let Some(dm) = self.decorator_method(&decorator_object) {
             dm.throws_type()
         } else {
             self.throws_type()
@@ -441,12 +441,12 @@ impl Method {
         Ok(())
     }
 
-    pub fn uses_delegate_method(&self) -> bool {
-        self.attributes.get_delegate_method().is_some()
+    pub fn uses_decorator_method(&self) -> bool {
+        self.attributes.get_decorator_method().is_some()
     }
 
-    pub fn delegate_method_name(&self) -> Option<String> {
-        Some(self.attributes.get_delegate_method()?.to_string())
+    pub fn decorator_method_name(&self) -> Option<String> {
+        Some(self.attributes.get_decorator_method()?.to_string())
     }
 }
 

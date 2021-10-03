@@ -59,7 +59,7 @@ pub enum Type {
     Enum(String),
     Error(String),
     CallbackInterface(String),
-    DelegateObject(String),
+    DecoratorObject(String),
     // Structurally recursive types.
     Optional(Box<Type>),
     Sequence(Box<Type>),
@@ -115,7 +115,7 @@ impl Type {
             Type::Map(t) => format!("Map{}", t.canonical_name()),
             // A type that exists externally.
             Type::External { name, .. } | Type::Wrapped { name, .. } => format!("Type{}", name),
-            Type::DelegateObject(nm) => format!("Delegate{}", nm),
+            Type::DecoratorObject(nm) => format!("Decorator{}", nm),
             Type::Generic => "GenericAny".into(),
         }
     }
@@ -168,7 +168,7 @@ impl From<&Type> for FFIType {
             | Type::Duration
             | Type::External { .. } => FFIType::RustBuffer,
             Type::Wrapped { prim, .. } => FFIType::from(prim.as_ref()),
-            Type::DelegateObject(_) => unreachable!("Delegate objects should never cross the FFI"),
+            Type::DecoratorObject(_) => unreachable!("Decorator objects should never cross the FFI"),
             Type::Generic => unreachable!("Generic types should never cross the FFI"),
         }
     }

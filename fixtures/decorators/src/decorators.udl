@@ -1,13 +1,13 @@
-namespace delegates {};
+namespace decorators {};
 
-[Delegate]
-interface MyDelegate {
+[Decorator]
+interface MyDecorator {
   Any? with_return();
   void string_saver();
   i32  with_counter();
 };
 
-[Delegate=MyDelegate]
+[Decorator=MyDecorator]
 interface RustObject {
   constructor();
 

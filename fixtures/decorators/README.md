@@ -1,6 +1,6 @@
 # A "Callbacks" test for uniffi components
 
-This is similar to the `delegates` example, but it's intended to be contrived and to
+This is similar to the `decorators` example, but it's intended to be contrived and to
 ensure we get good test coverage of all possible options.
 
 It's here so it doesn't even need to make a cursory effort to be a "good"

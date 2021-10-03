@@ -36,11 +36,11 @@ pub(super) enum Attribute {
     External(String),
     // Something hand-written in this crate which wraps a primitive type.
     Wrapped,
-    // Delegate objects are methods used to dispatch generated methods. e.g. catchAll and async
+    // Decorator objects are methods used to dispatch generated methods. e.g. catchAll and async
     // They only exist on the foreign language side.
-    DelegateObject,
-    WithDelegateObject(String),
-    WithDelegateMethod(String),
+    DecoratorObject,
+    WithDecoratorObject(String),
+    WithDecoratorMethod(String),
 }
 
 impl Attribute {
@@ -67,7 +67,7 @@ impl TryFrom<&weedle::attribute::ExtendedAttribute<'_>> for Attribute {
                 "Error" => Ok(Attribute::Error),
                 "Threadsafe" => Ok(Attribute::Threadsafe),
                 "Wrapped" => Ok(Attribute::Wrapped),
-                "Delegate" => Ok(Attribute::DelegateObject),
+                "Decorator" => Ok(Attribute::DecoratorObject),
                 _ => anyhow::bail!("ExtendedAttributeNoArgs not supported: {:?}", (attr.0).0),
             },
             // Matches assignment-style attributes like ["Throws=Error"]
@@ -77,10 +77,10 @@ impl TryFrom<&weedle::attribute::ExtendedAttribute<'_>> for Attribute {
                     "Throws" => Ok(Attribute::Throws(name_from_id_or_string(&identity.rhs))),
                     "Self" => Ok(Attribute::SelfType(SelfType::try_from(&identity.rhs)?)),
                     "External" => Ok(Attribute::External(name_from_id_or_string(&identity.rhs))),
-                    "Delegate" => Ok(Attribute::WithDelegateObject(name_from_id_or_string(
+                    "Decorator" => Ok(Attribute::WithDecoratorObject(name_from_id_or_string(
                         &identity.rhs,
                     ))),
-                    "CallWith" => Ok(Attribute::WithDelegateMethod(name_from_id_or_string(
+                    "CallWith" => Ok(Attribute::WithDecoratorMethod(name_from_id_or_string(
                         &identity.rhs,
                     ))),
                     _ => anyhow::bail!(
@@ -265,17 +265,17 @@ impl InterfaceAttributes {
             .any(|attr| matches!(attr, Attribute::Threadsafe))
     }
 
-    pub fn is_delegate(&self) -> bool {
+    pub fn is_decorator(&self) -> bool {
         self.0
             .iter()
-            .any(|attr| matches!(attr, Attribute::DelegateObject))
+            .any(|attr| matches!(attr, Attribute::DecoratorObject))
     }
 
-    pub(super) fn get_delegate_object(&self) -> Option<&str> {
+    pub(super) fn get_decorator_object(&self) -> Option<&str> {
         self.0.iter().find_map(|attr| match attr {
             // This will hopefully return a helpful compilation error
-            // if the delegate method is not defined.
-            Attribute::WithDelegateObject(inner) => Some(inner.as_ref()),
+            // if the decorator method is not defined.
+            Attribute::WithDecoratorObject(inner) => Some(inner.as_ref()),
             _ => None,
         })
     }
@@ -290,8 +290,8 @@ impl TryFrom<&weedle::attribute::ExtendedAttributeList<'_>> for InterfaceAttribu
             Attribute::Enum => Ok(()),
             Attribute::Error => Ok(()),
             Attribute::Threadsafe => Ok(()),
-            Attribute::DelegateObject => Ok(()),
-            Attribute::WithDelegateObject(_) => Ok(()),
+            Attribute::DecoratorObject => Ok(()),
+            Attribute::WithDecoratorObject(_) => Ok(()),
             _ => bail!(format!("{:?} not supported for interface definition", attr)),
         })?;
         // Can't be both `[Threadsafe]` and an `[Enum]`.
@@ -376,11 +376,11 @@ impl MethodAttributes {
             .any(|attr| matches!(attr, Attribute::SelfType(SelfType::ByArc)))
     }
 
-    pub fn get_delegate_method(&self) -> Option<&str> {
+    pub fn get_decorator_method(&self) -> Option<&str> {
         self.0.iter().find_map(|attr| match attr {
             // This will hopefully return a helpful compilation error
-            // if the delegate method is not defined.
-            Attribute::WithDelegateMethod(inner) => Some(inner.as_ref()),
+            // if the decorator method is not defined.
+            Attribute::WithDecoratorMethod(inner) => Some(inner.as_ref()),
             _ => None,
         })
     }
@@ -394,7 +394,7 @@ impl TryFrom<&weedle::attribute::ExtendedAttributeList<'_>> for MethodAttributes
         let attrs = parse_attributes(weedle_attributes, |attr| match attr {
             Attribute::SelfType(_) => Ok(()),
             Attribute::Throws(_) => Ok(()),
-            &Attribute::WithDelegateMethod(_) => Ok(()),
+            &Attribute::WithDecoratorMethod(_) => Ok(()),
             _ => bail!(format!("{:?} not supported for methods", attr)),
         })?;
         Ok(Self(attrs))
@@ -568,19 +568,19 @@ mod test {
     }
 
     #[test]
-    fn test_delegate() -> Result<()> {
-        let (_, node) = weedle::attribute::ExtendedAttribute::parse("Delegate").unwrap();
+    fn test_decorator() -> Result<()> {
+        let (_, node) = weedle::attribute::ExtendedAttribute::parse("Decorator").unwrap();
         let attr = Attribute::try_from(&node)?;
-        assert!(matches!(attr, Attribute::DelegateObject));
+        assert!(matches!(attr, Attribute::DecoratorObject));
 
         let (_, node) =
-            weedle::attribute::ExtendedAttribute::parse("Delegate=MyDelegateProtocol").unwrap();
+            weedle::attribute::ExtendedAttribute::parse("Decorator=MyDecoratorProtocol").unwrap();
         let attr = Attribute::try_from(&node)?;
-        assert!(matches!(attr, Attribute::WithDelegateObject(nm) if nm == "MyDelegateProtocol"));
+        assert!(matches!(attr, Attribute::WithDecoratorObject(nm) if nm == "MyDecoratorProtocol"));
 
         let (_, node) = weedle::attribute::ExtendedAttribute::parse("CallWith=asyncCall").unwrap();
         let attr = Attribute::try_from(&node)?;
-        assert!(matches!(attr, Attribute::WithDelegateMethod(nm) if nm == "asyncCall"));
+        assert!(matches!(attr, Attribute::WithDecoratorMethod(nm) if nm == "asyncCall"));
 
         Ok(())
     }
@@ -642,7 +642,7 @@ mod test {
         let err = FunctionAttributes::try_from(&node).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "WithDelegateMethod(\"asyncDispatch\") not supported for functions"
+            "WithDecoratorMethod(\"asyncDispatch\") not supported for functions"
         );
     }
 
@@ -657,25 +657,25 @@ mod test {
         let attrs = MethodAttributes::try_from(&node).unwrap();
         assert!(!attrs.get_self_by_arc());
         assert!(attrs.get_throws_err().is_none());
-        assert!(attrs.get_delegate_method().is_none());
+        assert!(attrs.get_decorator_method().is_none());
 
         let (_, node) =
             weedle::attribute::ExtendedAttributeList::parse("[Self=ByArc, Throws=Error]").unwrap();
         let attrs = MethodAttributes::try_from(&node).unwrap();
         assert!(attrs.get_self_by_arc());
         assert!(attrs.get_throws_err().is_some());
-        assert!(attrs.get_delegate_method().is_none());
+        assert!(attrs.get_decorator_method().is_none());
 
         let (_, node) = weedle::attribute::ExtendedAttributeList::parse("[Self=ByArc]").unwrap();
         let attrs = MethodAttributes::try_from(&node).unwrap();
         assert!(attrs.get_self_by_arc());
         assert!(attrs.get_throws_err().is_none());
-        assert!(attrs.get_delegate_method().is_none());
+        assert!(attrs.get_decorator_method().is_none());
 
         let (_, node) =
             weedle::attribute::ExtendedAttributeList::parse("[CallWith=asyncDispatch]").unwrap();
         let attrs = MethodAttributes::try_from(&node).unwrap();
-        assert!(matches!(attrs.get_delegate_method(), Some("asyncDispatch")));
+        assert!(matches!(attrs.get_decorator_method(), Some("asyncDispatch")));
     }
 
     #[test]
@@ -782,7 +782,7 @@ mod test {
         );
 
         let (_, node) = weedle::attribute::ExtendedAttributeList::parse(
-            "[Delegate=MyDelegateObject, Delegate]",
+            "[Decorator=MyDecoratorObject, Decorator]",
         )
         .unwrap();
         let err = InterfaceAttributes::try_from(&node).unwrap_err();

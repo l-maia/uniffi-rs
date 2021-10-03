@@ -3,46 +3,46 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::bindings::backend::{CodeDeclaration, CodeOracle, CodeType};
-use crate::interface::{ComponentInterface, DelegateObject};
+use crate::interface::{ComponentInterface, DecoratorObject};
 use askama::Template;
 
 use super::filters;
-pub struct DelegateObjectCodeType {
+pub struct DecoratorObjectCodeType {
     id: String,
 }
 
-impl DelegateObjectCodeType {
+impl DecoratorObjectCodeType {
     pub fn new(id: String) -> Self {
         Self { id }
     }
 }
 
-impl CodeType for DelegateObjectCodeType {
+impl CodeType for DecoratorObjectCodeType {
     fn type_label(&self, oracle: &dyn CodeOracle) -> String {
         oracle.class_name(&self.id)
     }
 
     fn canonical_name(&self, oracle: &dyn CodeOracle) -> String {
-        format!("Delegate{}", self.type_label(oracle))
+        format!("Decorator{}", self.type_label(oracle))
     }
 }
 
 #[derive(Template)]
-#[template(syntax = "kt", escape = "none", path = "DelegateObjectTemplate.kt")]
-pub struct KotlinDelegateObject {
-    inner: DelegateObject,
+#[template(syntax = "kt", escape = "none", path = "DecoratorObjectTemplate.kt")]
+pub struct KotlinDecoratorObject {
+    inner: DecoratorObject,
 }
 
-impl KotlinDelegateObject {
-    pub fn new(inner: DelegateObject, _ci: &ComponentInterface) -> Self {
+impl KotlinDecoratorObject {
+    pub fn new(inner: DecoratorObject, _ci: &ComponentInterface) -> Self {
         Self { inner }
     }
-    pub fn inner(&self) -> &DelegateObject {
+    pub fn inner(&self) -> &DecoratorObject {
         &self.inner
     }
 }
 
-impl CodeDeclaration for KotlinDelegateObject {
+impl CodeDeclaration for KotlinDecoratorObject {
     fn definition_code(&self, _oracle: &dyn CodeOracle) -> Option<String> {
         Some(self.render().unwrap())
     }

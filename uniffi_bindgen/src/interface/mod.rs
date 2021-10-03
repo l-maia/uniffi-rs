@@ -72,8 +72,8 @@ mod namespace;
 pub use namespace::Namespace;
 mod object;
 pub use object::{Constructor, Method, Object};
-mod delegate;
-pub use delegate::{DelegateMethod, DelegateObject};
+mod decorator;
+pub use decorator::{DecoratorMethod, DecoratorObject};
 mod record;
 pub use record::{Field, Record};
 
@@ -98,7 +98,7 @@ pub struct ComponentInterface {
     records: Vec<Record>,
     functions: Vec<Function>,
     objects: Vec<Object>,
-    delegate_objects: Vec<DelegateObject>,
+    decorator_objects: Vec<DecoratorObject>,
     callback_interfaces: Vec<CallbackInterface>,
     errors: Vec<Error>,
 }
@@ -187,15 +187,15 @@ impl<'ci> ComponentInterface {
         self.objects.iter().find(|o| o.name == name)
     }
 
-    /// List the definitions for every Delegate type in the interface.
-    pub fn iter_delegate_definitions(&self) -> Vec<DelegateObject> {
-        self.delegate_objects.to_vec()
+    /// List the definitions for every Decorator type in the interface.
+    pub fn iter_decorator_definitions(&self) -> Vec<DecoratorObject> {
+        self.decorator_objects.to_vec()
     }
 
-    /// Get an Delegate definition by name, or None if no such Delegate is defined.
-    pub fn get_delegate_definition(&self, name: &str) -> Option<&DelegateObject> {
+    /// Get an Decorator definition by name, or None if no such Decorator is defined.
+    pub fn get_decorator_definition(&self, name: &str) -> Option<&DecoratorObject> {
         // TODO: probably we could store these internally in a HashMap to make this easier?
-        self.delegate_objects.iter().find(|o| o.name == name)
+        self.decorator_objects.iter().find(|o| o.name == name)
     }
 
     /// List the definitions for every Callback Interface type in the interface.
@@ -279,10 +279,10 @@ impl<'ci> ComponentInterface {
             .any(|t| matches!(t, Type::UInt8 | Type::UInt16 | Type::UInt32 | Type::UInt64))
     }
 
-    /// Check whether the given item contains any (possibly nested) delegates
-    pub fn item_contains_delegate_objects<T: IterTypes>(&self, item: &T) -> bool {
+    /// Check whether the given item contains any (possibly nested) decorators
+    pub fn item_contains_decorator_objects<T: IterTypes>(&self, item: &T) -> bool {
         self.iter_types_in_item(item)
-            .any(|t| matches!(t, Type::DelegateObject(_)))
+            .any(|t| matches!(t, Type::DecoratorObject(_)))
     }
 
     /// Check whether the interface contains any optional types
@@ -527,10 +527,10 @@ impl<'ci> ComponentInterface {
         self.objects.push(defn);
     }
 
-    /// Called by `APIBuilder` impls to add a newly-parsed delegate definition to the `ComponentInterface`.
-    fn add_delegate_definition(&mut self, defn: DelegateObject) {
+    /// Called by `APIBuilder` impls to add a newly-parsed decorator definition to the `ComponentInterface`.
+    fn add_decorator_definition(&mut self, defn: DecoratorObject) {
         // Note that there will be no duplicates thanks to the previous type-finding pass.
-        self.delegate_objects.push(defn);
+        self.decorator_objects.push(defn);
     }
 
     /// Called by `APIBuilder` impls to add a newly-parsed callback interface definition to the `ComponentInterface`.
@@ -566,21 +566,21 @@ impl<'ci> ComponentInterface {
             }
         }
 
-        // Do some checks around delegate objects. This ensures code-generation isn't full of error handling.
-        // Each object using a delegate object:
-        //  * the delegate should be declared.
-        //  * the declared delegate should be an interface with a [Delegate] annotation.
-        //  * each delegated method should match up with the delegate object's methods.
-        // Each object not using a delegate object:
-        //  * no method should use a delegate method.
-        let mut with_delegates = HashSet::<Type>::new();
+        // Do some checks around decorator objects. This ensures code-generation isn't full of error handling.
+        // Each object using a decorator object:
+        //  * the decorator should be declared.
+        //  * the declared decorator should be an interface with a [Decorator] annotation.
+        //  * each decorated method should match up with the decorator object's methods.
+        // Each object not using a decorator object:
+        //  * no method should use a decorator method.
+        let mut with_decorators = HashSet::<Type>::new();
         for obj in self.objects.iter() {
-            match &obj.delegate_type {
-                Some(Type::DelegateObject(dobj)) => {
-                    let dobj = match self.get_delegate_definition(dobj) {
+            match &obj.decorator_type {
+                Some(Type::DecoratorObject(dobj)) => {
+                    let dobj = match self.get_decorator_definition(dobj) {
                         Some(d) => d,
                         _ => bail!(
-                            "Object '{}' has a delegate '{}' which is not defined",
+                            "Object '{}' has a decorator '{}' which is not defined",
                             obj.name(),
                             dobj
                         ),
@@ -588,9 +588,9 @@ impl<'ci> ComponentInterface {
 
                     let mut used = false;
                     for method in obj.methods.iter() {
-                        if let Some(dm) = &method.delegate_method_name() {
+                        if let Some(dm) = &method.decorator_method_name() {
                             if dobj.find_method(dm).is_none() {
-                                bail!("Object method '{}.{}' calls with a delegate method '{}.{}' which does not exist",
+                                bail!("Object method '{}.{}' calls with a decorator method '{}.{}' which does not exist",
                                     obj.name(),
                                     method.name(),
                                     dobj.name(),
@@ -602,20 +602,20 @@ impl<'ci> ComponentInterface {
                     }
 
                     if !used {
-                        bail!("Object '{}' has a delegate but no methods have [CallWith=] annotations to use it", obj.name())
+                        bail!("Object '{}' has a decorator but no methods have [CallWith=] annotations to use it", obj.name())
                     }
 
-                    with_delegates.insert(obj.type_());
+                    with_decorators.insert(obj.type_());
                 }
                 Some(type_) => bail!(
-                    "Delegates must be interfaces with a [Delegate] annotation ({:?} on {} is not)",
+                    "Decorators must be interfaces with a [Decorator] annotation ({:?} on {} is not)",
                     type_,
                     obj.name()
                 ),
                 _ => {
                     for method in obj.methods.iter() {
-                        if let Some(dm) = &method.delegate_method_name() {
-                            bail!("Object method '{}.{}' calls with a delegate method '{}' on a delegate that does not exist",
+                        if let Some(dm) = &method.decorator_method_name() {
+                            bail!("Object method '{}.{}' calls with a decorator method '{}' on a decorator that does not exist",
                                 obj.name(),
                                 method.name(),
                                 dm,
@@ -627,38 +627,38 @@ impl<'ci> ComponentInterface {
         }
 
         for obj in self.objects.iter() {
-            if self.item_contains_delegate_objects(obj) {
+            if self.item_contains_decorator_objects(obj) {
                 bail!(
-                    "Object '{}' cannot pass delegate objects across the FFI",
+                    "Object '{}' cannot pass decorator objects across the FFI",
                     obj.name()
                 )
             }
 
             if self
                 .iter_types_in_item(obj)
-                .any(|t| with_delegates.contains(t))
+                .any(|t| with_decorators.contains(t))
             {
                 bail!(
-                    "Object '{}' cannot pass objects that have delegates across the FFI",
+                    "Object '{}' cannot pass objects that have decorators across the FFI",
                     obj.name()
                 )
             }
         }
 
         for func in self.functions.iter() {
-            if self.item_contains_delegate_objects(func) {
+            if self.item_contains_decorator_objects(func) {
                 bail!(
-                    "Function '{}' cannot pass delegate objects across the FFI",
+                    "Function '{}' cannot pass decorator objects across the FFI",
                     func.name()
                 )
             }
 
             if self
                 .iter_types_in_item(func)
-                .any(|t| with_delegates.contains(t))
+                .any(|t| with_decorators.contains(t))
             {
                 bail!(
-                    "Function '{}' cannot pass objects that have delegates across the FFI",
+                    "Function '{}' cannot pass objects that have decorators across the FFI",
                     func.name()
                 )
             }
@@ -876,9 +876,9 @@ impl APIBuilder for weedle::Definition<'_> {
                 } else if attrs.contains_error_attr() {
                     let e = d.convert(ci)?;
                     ci.add_error_definition(e);
-                } else if attrs.is_delegate() {
+                } else if attrs.is_decorator() {
                     let d = d.convert(ci)?;
-                    ci.add_delegate_definition(d);
+                    ci.add_decorator_definition(d);
                 } else {
                     let obj = d.convert(ci)?;
                     ci.add_object_definition(obj);
@@ -1125,11 +1125,11 @@ mod test {
     }
 
     #[test]
-    fn test_delegate_methods_check_consistency() {
-        // Delegate missing completely
+    fn test_decorator_methods_check_consistency() {
+        // Decorator missing completely
         let udl: &str = r#"
             namespace test{};
-            [Delegate=TheDelegate]
+            [Decorator=TheDecorator]
             interface TheObject {
                 [CallWith=pass_through]
                 void method();
@@ -1138,31 +1138,31 @@ mod test {
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object \'TheObject\' has a delegate \'TheDelegate\' which is not defined"
+            "Object \'TheObject\' has a decorator \'TheDecorator\' which is not defined"
         );
 
-        // Delegate missing the annotation "Delegate"
+        // Decorator missing the annotation "Decorator"
         let udl: &str = r#"
             namespace test{};
-            [Delegate=TheDelegate]
+            [Decorator=TheDecorator]
             interface TheObject {
                 [CallWith=pass_through]
                 void method();
             };
-            interface TheDelegate {
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Delegates must be interfaces with a [Delegate] annotation (Object(\"TheDelegate\") on TheObject is not)"
+            "Decorators must be interfaces with a [Decorator] annotation (Object(\"TheDecorator\") on TheObject is not)"
         );
 
         // The object declaring an incorrect type
         let udl: &str = r#"
             namespace test{};
-            [Delegate=TheDictionary]
+            [Decorator=TheDictionary]
             interface TheObject {
                 [CallWith=pass_through]
                 void method();
@@ -1175,149 +1175,149 @@ mod test {
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Delegates must be interfaces with a [Delegate] annotation (Record(\"TheDictionary\") on TheObject is not)"
+            "Decorators must be interfaces with a [Decorator] annotation (Record(\"TheDictionary\") on TheObject is not)"
         );
 
-        // The delegated call with method is does not have a delegate to go through.
+        // The decorated call with method is does not have a decorator to go through.
         let udl: &str = r#"
             namespace test{};
             interface TheObject {
                 [CallWith=pass_through]
                 void method();
             };
-            [Delegate]
-            interface TheDelegate {
+            [Decorator]
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object method \'TheObject.method\' calls with a delegate method \'pass_through\' on a delegate that does not exist"
+            "Object method \'TheObject.method\' calls with a decorator method \'pass_through\' on a decorator that does not exist"
         );
 
-        // The delegated call with method is misspelled
+        // The decorated call with method is misspelled
         let udl: &str = r#"
             namespace test{};
-            [Delegate=TheDelegate]
+            [Decorator=TheDecorator]
             interface TheObject {
                 [CallWith=pass_thru]
                 void method();
             };
-            [Delegate]
-            interface TheDelegate {
+            [Decorator]
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object method \'TheObject.method\' calls with a delegate method \'TheDelegate.pass_thru\' which does not exist"
+            "Object method \'TheObject.method\' calls with a decorator method \'TheDecorator.pass_thru\' which does not exist"
         );
 
         // Perhaps the user has forgotten to use CallWith annotations.
         let udl: &str = r#"
             namespace test{};
-            [Delegate=TheDelegate]
+            [Decorator=TheDecorator]
             interface TheObject {
                 void method();
             };
-            [Delegate]
-            interface TheDelegate {
+            [Decorator]
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object \'TheObject\' has a delegate but no methods have [CallWith=] annotations to use it"
+            "Object \'TheObject\' has a decorator but no methods have [CallWith=] annotations to use it"
         );
     }
 
     #[test]
-    fn test_delegate_cannot_cross_ffi_check_consistency() {
-        // Delegate cannot pass via a function
+    fn test_decorator_cannot_cross_ffi_check_consistency() {
+        // Decorator cannot pass via a function
         let udl: &str = r#"
             namespace test{
-                void set_delegate(TheDelegate theDelegate);
+                void set_decorator(TheDecorator theDecorator);
             };
 
-            [Delegate]
-            interface TheDelegate {
+            [Decorator]
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Function \'set_delegate\' cannot pass delegate objects across the FFI"
+            "Function \'set_decorator\' cannot pass decorator objects across the FFI"
         );
 
-        // Delegate cannot pass via a method
+        // Decorator cannot pass via a method
         let udl: &str = r#"
             namespace test{
             };
 
             interface BadObject {
-                void set_delegate(TheDelegate theDelegate);
+                void set_decorator(TheDecorator theDecorator);
             };
 
-            [Delegate]
-            interface TheDelegate {
+            [Decorator]
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object \'BadObject\' cannot pass delegate objects across the FFI"
+            "Object \'BadObject\' cannot pass decorator objects across the FFI"
         );
 
-        // Delegate cannot pass via a method, even indirectly
+        // Decorator cannot pass via a method, even indirectly
         let udl: &str = r#"
             namespace test{
             };
 
             interface BadObject {
-                void set_dictionary_with_delegate(Dict dict);
+                void set_dictionary_with_decorator(Dict dict);
             };
 
             dictionary Dict {
-                TheDelegate theDelegate;
+                TheDecorator theDecorator;
             };
 
-            [Delegate]
-            interface TheDelegate {
+            [Decorator]
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object \'BadObject\' cannot pass delegate objects across the FFI"
+            "Object \'BadObject\' cannot pass decorator objects across the FFI"
         );
 
-        // Objects with delegates can't cross the FFI either; via functions…
+        // Objects with decorators can't cross the FFI either; via functions…
         let udl: &str = r#"
             namespace test{
                 TheObject get_the_object();
             };
 
-            [Delegate=TheDelegate]
+            [Decorator=TheDecorator]
             interface TheObject {
                 [CallWith=pass_through]
                 void do_something();
             };
 
-            [Delegate]
-            interface TheDelegate {
+            [Decorator]
+            interface TheDecorator {
                 void pass_through();
             };
         "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Function \'get_the_object\' cannot pass objects that have delegates across the FFI"
+            "Function \'get_the_object\' cannot pass objects that have decorators across the FFI"
         );
 
         // …or Objects.
@@ -1328,21 +1328,21 @@ mod test {
             void set_the_object(TheObject the_object);
         };
 
-        [Delegate=TheDelegate]
+        [Decorator=TheDecorator]
         interface TheObject {
             [CallWith=pass_through]
             void do_something();
         };
 
-        [Delegate]
-        interface TheDelegate {
+        [Decorator]
+        interface TheDecorator {
             void pass_through();
         };
     "#;
         let err = ComponentInterface::from_webidl(udl).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Object \'BadObject\' cannot pass objects that have delegates across the FFI"
+            "Object \'BadObject\' cannot pass objects that have decorators across the FFI"
         );
     }
 }

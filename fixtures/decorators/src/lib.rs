@@ -31,4 +31,4 @@ impl RustObject {
     }
 }
 
-include!(concat!(env!("OUT_DIR"), "/delegates.uniffi.rs"));
+include!(concat!(env!("OUT_DIR"), "/decorators.uniffi.rs"));
