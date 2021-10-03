@@ -675,7 +675,10 @@ mod test {
         let (_, node) =
             weedle::attribute::ExtendedAttributeList::parse("[CallsWith=asyncDispatch]").unwrap();
         let attrs = MethodAttributes::try_from(&node).unwrap();
-        assert!(matches!(attrs.get_decorator_method(), Some("asyncDispatch")));
+        assert!(matches!(
+            attrs.get_decorator_method(),
+            Some("asyncDispatch")
+        ));
     }
 
     #[test]

@@ -392,7 +392,10 @@ impl Method {
         }
     }
 
-    pub fn decorated_return_type(&self, decorator_object: &Option<&DecoratorObject>) -> Option<Type> {
+    pub fn decorated_return_type(
+        &self,
+        decorator_object: &Option<&DecoratorObject>,
+    ) -> Option<Type> {
         if let Some(dm) = self.decorator_method(decorator_object) {
             match (dm.return_type(), self.return_type()) {
                 (Some(dmt), _) if !dmt.is_generic() => Some(dmt.clone()),
@@ -418,7 +421,10 @@ impl Method {
             .map(|name| Type::Error(name.to_owned()))
     }
 
-    pub fn decorated_throws_type(&self, decorator_object: &Option<&DecoratorObject>) -> Option<Type> {
+    pub fn decorated_throws_type(
+        &self,
+        decorator_object: &Option<&DecoratorObject>,
+    ) -> Option<Type> {
         if let Some(dm) = self.decorator_method(&decorator_object) {
             dm.throws_type()
         } else {

@@ -168,7 +168,9 @@ impl From<&Type> for FFIType {
             | Type::Duration
             | Type::External { .. } => FFIType::RustBuffer,
             Type::Wrapped { prim, .. } => FFIType::from(prim.as_ref()),
-            Type::DecoratorObject(_) => unreachable!("Decorator objects should never cross the FFI"),
+            Type::DecoratorObject(_) => {
+                unreachable!("Decorator objects should never cross the FFI")
+            }
             Type::Generic => unreachable!("Generic types should never cross the FFI"),
         }
     }
