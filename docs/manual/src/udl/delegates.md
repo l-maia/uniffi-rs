@@ -7,8 +7,7 @@ interface DemoRustObject {
     void do_expensive_thing();
     [Throws=RustyError]
     void do_crashy_thing();
-    string get_state_at(i32 index);
-    void set_state_at(i32 index, string value);
+    void do_consequential_thing();
 }
 ```
 
@@ -16,12 +15,17 @@ interface DemoRustObject {
 
 ## Problem
 
-Just by the names of these methods, we can see that the application might not want to deal with the `DemoRustObject` by itself, without some proper care taken while calling its methods.
+Just by the names of these methods, we can see that the application might not want to deal with the `DemoRustObject` by itself, without some proper care taken while calling its methods:
+
+* it may want to run `do_expensive_thing()` off the main thread
+* it may want to catch and report errors from `do_crashy_thing()`.
+* it may want to inform the rest of the application each time `do_consequential_thing()` is called.
 
 A common pattern when using uniffied code is to run some common, but app-specific, code before or after calling the Rust code.
 
 ```kotlin
 class DemoLib(
+    val listener: () -> Void,
     val backgroundScope: CoroutineContext,
     val errorReporter: (e: Exception) -> Unit,
 ) {
@@ -33,7 +37,7 @@ class DemoLib(
         }
     }
 
-    fun doCrashyThing() {}
+    fun doCrashyThing() {
         try {
             demoRustObject.doCrashyThing()
         } catch (e: Exception) {
@@ -41,21 +45,9 @@ class DemoLib(
         }
     }
 
-    fun getStateAt(index: Int): String =
-        try {
-            demoRustObject.getState(index)
-        } catch (e: Exception) {
-            errorReporter(e)
-        }
-
-    fun setStateAt(index: Int, value: String) {
-        try {
-            demoRustObject.getState(index)
-        } finally {
-            // not shown here.
-            // Does something with the DemoRustObject
-            this.notifyListeners()
-        }
+    fun doConsequentialThing() {
+        demoRustObject.doConsequentialThing()
+        listener()
     }
 }
 ```
@@ -64,7 +56,7 @@ This causes a proliferation of boiler plate code. Worse, everytime we add a new 
 
 The more methods that want to do similar things, the more repetitive this gets.
 
-We could isolate the repeated code into a delegate class with `onBackgroundThread` and `withErrorReporter` methods.
+We could isolate the repeated code into a delegate class with `onBackgroundThread`, `withErrorReporter` and `thenNotifyListeners` methods.
 
 We'll handwrite a little delegate interface, then write an implementation that we pass the thread pool/coroutine context/whatever, and the error reporter.
 
@@ -118,12 +110,8 @@ class DemoLib(
         demoRustObject.doCrashyThing()
     }
 
-    fun getStateAt(index: Int) = delegate.withErrorReporter {
-        rust.getStateAt(index)
-    }
-
-    fun setStateAt(index: Int, value: String) = delegate.thenNotifyListeners(this) {
-        rust.setStateAt(index, value)
+    fun doConsequentialThing() = delegate.thenNotifyListeners(this) {
+        demoRustObject.doConsequentialThing()
     }
 }
 ```
@@ -150,11 +138,8 @@ interface DemoRustObject {
     [Throws=RustyError, CallWith=with_error_reporter]
     void do_crashy_thing();
 
-    [CallWith=with_error_reporter]
-    string get_state_at(i32 index);
-
     [CallWith=then_notify_listeners]
-    void set_state_at(i32 index, string value);
+    void do_consequential_thing();
 }
 ```
 
@@ -184,7 +169,7 @@ This changes the generated API of `DemoRustObject`:
 Now the generated Rust calls go through the app-specific delegate methods, we could more safely hand the rust object to the application to use directly.
 
 ```kotlin
-val delegate = MyDemoDelegate(backgroundScope, errorReporter)
+val delegate = MyDemoDelegate(listener, backgroundScope, errorReporter)
 val demoRustObject = DemoRustObject(delegate)
 ```
 
@@ -212,9 +197,10 @@ class DemoLib private constructor(
     constructor(delegate: DemoDelegate) = this(DemoRustObject(delegate))
 
     constructor(
+        listener: () -> Unit,
         backgroundScope: CoroutineContext,
         errorReporter: (e: Exception) -> Unit
-    ) = this(MyDemoDelegate(backgroundScope, errorReporter))
+    ) = this(MyDemoDelegate(listener, backgroundScope, errorReporter))
 }
 ```
 
@@ -229,10 +215,12 @@ typealias DemoLib = DemoRustObject
 extension DemoLib {
     convenience init(
         backgroundQueue: OperationQueue,
+        listener: @escaping () -> Void,
         errorReporter: @escaping (Error) -> Void
     ) {
         self.init(
             MyDemoDelegate(
+                listener: listener,
                 backgroundQueue: backgroundQueue,
                 errorReporter: errorReporter
             )
