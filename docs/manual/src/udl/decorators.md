@@ -25,9 +25,9 @@ A common pattern when using uniffied code is to run some common, but app-specifi
 
 ```kotlin
 class DemoLib(
-    val listener: () -> Void,
     val backgroundScope: CoroutineContext,
     val errorReporter: (e: Exception) -> Unit,
+    val listener: () -> Void
 ) {
     val demoRustObject = new DemoRustObject()
 
@@ -69,7 +69,8 @@ interface DemoDecorator {
 
 class MyDemoDecorator(
     val backgroundScope: CoroutineContext,
-    val errorReporter: (e: Exception) -> Unit
+    val errorReporter: (e: Exception) -> Unit,
+    val listener: () -> Void
 ) : DemoDecorator {
     fun onBackgroundThread(rustCall: () -> Unit) {
         backgroundScope.launch {
@@ -84,11 +85,11 @@ class MyDemoDecorator(
             errorReporter(e)
         }
 
-    fun thenNotifyListeners(obj: DemoLib, () -> T) {
+    fun thenNotifyListeners(obj: DemoLib, rustCall: () -> T) {
         try {
             rustCall()
         } finally {
-            notifyListeners(obj)
+            listener()
         }
     }
 }
@@ -145,9 +146,18 @@ interface DemoRustObject {
 
 With this UDL: the `[Decorator]` annotation declares an `DemoDecorator` as a decorator object. Decorator objects never cross the FFI.
 
+> Decorator objects take their name from [Python's decorator methods][py-decorators].
+>
+> In Pythonic terms, Uniffi's decorator objects are a collection of decorator functions.
+>
+> Swift and Kotlin don't provide functionality to capture arbitrary `*args` and call a function with those same `*args`, so
+> at this time, decorator objects aren't as powerful as Python decorators. Nevertheless, they can be still quite useful.
+
+[py-decorators]: https://www.python.org/dev/peps/pep-0318/#on-the-name-decorator
+
 They are implemented as a `protocol` in Swift, and `interface` in Kotlin.
 
-They declare zero argument methods, but can return an arbitrary concrete type, `void` or the generic `any` type. The `DemoDecorator` interface is now generated,
+They declare zero argument methods, but can return an arbitrary concrete type, `void` or the generic `Any` type. The `DemoDecorator` interface is now generated,
 and each method accepts the decorated object and a generic closure which will call the Rust code.
 
 ```kotlin
@@ -155,7 +165,7 @@ and each method accepts the decorated object and a generic closure which will ca
 interface DemoDecorator<ObjectType> {
     fun <ReturnType> onBackgroundThread(obj: ObjectType, rustCall: () -> ReturnType)
     fun <ReturnType> withErrorReporter(obj: ObjectType, rustCall: () -> ReturnType): ReturnType?
-    fun <ReturnType> thenNotifyListeners(obj: ObjectType, rustCall: () -> ReturnType): ReturnType
+    fun <ReturnType> thenNotifyListeners(obj: ObjectType, rustCall: () -> ReturnType)
 }
 ```
 
@@ -169,7 +179,7 @@ This changes the generated API of `DemoRustObject`:
 Now the generated Rust calls go through the app-specific decorator methods, we could more safely hand the rust object to the application to use directly.
 
 ```kotlin
-val decorator = MyDemoDecorator(listener, backgroundScope, errorReporter)
+val decorator = MyDemoDecorator(backgroundScope, errorReporter, listener)
 val demoRustObject = DemoRustObject(decorator)
 ```
 
@@ -197,10 +207,10 @@ class DemoLib private constructor(
     constructor(decorator: DemoDecorator) = this(DemoRustObject(decorator))
 
     constructor(
-        listener: () -> Unit,
         backgroundScope: CoroutineContext,
-        errorReporter: (e: Exception) -> Unit
-    ) = this(MyDemoDecorator(listener, backgroundScope, errorReporter))
+        errorReporter: (e: Exception) -> Unit,
+        listener: () -> Unit
+    ) = this(MyDemoDecorator(backgroundScope, errorReporter, listener))
 }
 ```
 
@@ -215,14 +225,14 @@ typealias DemoLib = DemoRustObject
 extension DemoLib {
     convenience init(
         backgroundQueue: OperationQueue,
-        listener: @escaping () -> Void,
-        errorReporter: @escaping (Error) -> Void
+        errorReporter: @escaping (Error) -> Void,
+        listener: @escaping () -> Void
     ) {
         self.init(
             MyDemoDecorator(
-                listener: listener,
                 backgroundQueue: backgroundQueue,
-                errorReporter: errorReporter
+                errorReporter: errorReporter,
+                listener: listener
             )
         )
     }
