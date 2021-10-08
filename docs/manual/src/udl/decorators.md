@@ -133,7 +133,7 @@ interface DemoDecorator {
 
 [Decorator=DemoDecorator]
 interface DemoRustObject {
-    [CallsWith=on_backghround_thread]
+    [CallsWith=on_background_thread]
     void do_expensive_thing();
 
     [Throws=RustyError, CallsWith=with_error_reporter]
