@@ -180,6 +180,10 @@ pub(crate) fn rewrite_generic(l: &Type, r: &Type) -> Type {
     match l {
         // Generic gets replaced with the right hand side
         Type::Generic => r.to_owned(),
+
+        // Special case T? when T is itself optional, to avoid String??
+        Type::Optional(t) if matches!(**t, Type::Generic) && matches!(r, Type::Optional {..}) => rewrite_generic(t, r),
+
         // Structural types
         Type::Optional(t) => Type::Optional(Box::new(rewrite_generic(t, r))),
         Type::Sequence(t) => Type::Sequence(Box::new(rewrite_generic(t, r))),
